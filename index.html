@@ -1,0 +1,66 @@
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>אפליקציית זיהוי אובייקטים</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"></link>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+            .then(function(registration) {
+                console.log('Service Worker registered with scope:', registration.scope);
+            }).catch(function(error) {
+                console.log('Service Worker registration failed:', error);
+            });
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white shadow-lg rounded-lg p-6 w-full max-w-md">
+        <h1 class="text-2xl font-bold mb-4 text-center">אפליקציית זיהוי אובייקטים</h1>
+        <div class="mb-4">
+            <label for="object" class="block text-sm font-medium text-gray-700">בחר אובייקט לזיהוי:</label>
+            <select id="object" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <option>אובייקט 1</option>
+                <option>אובייקט 2</option>
+                <option>אובייקט 3</option>
+            </select>
+        </div>
+        <div class="mb-4">
+            <label for="action" class="block text-sm font-medium text-gray-700">בחר פעולה לביצוע:</label>
+            <select id="action" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <option>גלילה למעלה</option>
+                <option>הקשה כפולה</option>
+            </select>
+        </div>
+        <div class="mb-4">
+            <label for="image" class="block text-sm font-medium text-gray-700">העלה תמונה של האובייקט:</label>
+            <input type="file" id="image" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        </div>
+        <button id="start" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">התחל זיהוי</button>
+    </div>
+
+    <script>
+        document.getElementById('start').addEventListener('click', function() {
+            const object = document.getElementById('object').value;
+            const action = document.getElementById('action').value;
+            const image = document.getElementById('image').files[0];
+            
+            if (!image) {
+                alert('אנא העלה תמונה של האובייקט');
+                return;
+            }
+
+            alert(`זיהוי ${object} וביצוע ${action} עם התמונה ${image.name}`);
+        });
+    </script>
+</body>
+</html>
