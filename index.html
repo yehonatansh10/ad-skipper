@@ -47,8 +47,8 @@
             </select>
         </div>
         <div id="specificApps" class="text-center mb-4 hidden">
-            <label for="appsList" class="block text-gray-700">Enter App Names (comma separated):</label>
-            <input type="text" id="appsList" class="block w-full mt-1 p-2 border rounded">
+            <label for="appsList" class="block text-gray-700">Select Installed Apps:</label>
+            <select id="appsList" class="block w-full mt-1 p-2 border rounded" multiple></select>
         </div>
     </div>
 
@@ -217,16 +217,35 @@
             const specificAppsDiv = document.getElementById('specificApps');
             if (value === 'specific') {
                 specificAppsDiv.classList.remove('hidden');
+                loadInstalledApps();
             } else {
                 specificAppsDiv.classList.add('hidden');
                 monitoredApps = [];
             }
         });
 
-        document.getElementById('appsList').addEventListener('input', function(event) {
-            const value = event.target.value;
-            monitoredApps = value.split(',').map(app => app.trim());
-        });
+        function loadInstalledApps() {
+            // This is a placeholder function. In a real-world scenario, you would use platform-specific APIs to get the list of installed apps.
+            const installedApps = [
+                'App 1',
+                'App 2',
+                'App 3',
+                'App 4'
+            ];
+
+            const appsList = document.getElementById('appsList');
+            appsList.innerHTML = '';
+            installedApps.forEach(app => {
+                const option = document.createElement('option');
+                option.value = app;
+                option.textContent = app;
+                appsList.appendChild(option);
+            });
+
+            appsList.addEventListener('change', function() {
+                monitoredApps = Array.from(appsList.selectedOptions).map(option => option.value);
+            });
+        }
 
         // Background monitoring logic
         if ('serviceWorker' in navigator) {
