@@ -1,66 +1,254 @@
-<html lang="he">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>אפליקציית זיהוי אובייקטים</title>
+    <title>Object and Text Detection App</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"></link>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="manifest" href="/manifest.json">
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js')
-            .then(function(registration) {
-                console.log('Service Worker registered with scope:', registration.scope);
-            }).catch(function(error) {
-                console.log('Service Worker registration failed:', error);
-            });
-        }
-    </script>
     <style>
-        body {
-            font-family: 'Roboto', sans-serif;
+        #videoElement {
+            width: 100%;
+            height: auto;
+        }
+        #uploadedImage {
+            max-width: 100%;
+            height: auto;
+        }
+        .highlight {
+            border: 2px solid red;
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-    <div class="bg-white shadow-lg rounded-lg p-6 w-full max-w-md">
-        <h1 class="text-2xl font-bold mb-4 text-center">אפליקציית זיהוי אובייקטים</h1>
-        <div class="mb-4">
-            <label for="object" class="block text-sm font-medium text-gray-700">בחר אובייקט לזיהוי:</label>
-            <select id="object" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                <option>אובייקט 1</option>
-                <option>אובייקט 2</option>
-                <option>אובייקט 3</option>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen">
+    <div class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold text-center mb-6">Object and Text Detection App</h1>
+        <div class="flex justify-center mb-4">
+            <video id="videoElement" autoplay></video>
+        </div>
+        <div class="text-center mb-4">
+            <input type="file" id="imageUpload" class="mb-4" accept="image/*">
+            <img id="uploadedImage" src="" alt="Uploaded object image" class="hidden">
+        </div>
+        <div class="text-center mb-4">
+            <button id="toggleMonitoringButton" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700">
+                Start Monitoring
+            </button>
+        </div>
+        <div class="text-center mb-4">
+            <button id="requestPermissionButton" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-700">
+                Request Background Permission
+            </button>
+        </div>
+        <div class="text-center mb-4">
+            <label for="appSelect" class="block text-gray-700">Select Apps to Monitor:</label>
+            <select id="appSelect" class="block w-full mt-1">
+                <option value="all">All Apps</option>
+                <option value="specific">Specific Apps</option>
             </select>
         </div>
-        <div class="mb-4">
-            <label for="action" class="block text-sm font-medium text-gray-700">בחר פעולה לביצוע:</label>
-            <select id="action" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                <option>גלילה למעלה</option>
-                <option>הקשה כפולה</option>
-            </select>
+        <div id="specificApps" class="text-center mb-4 hidden">
+            <label for="appsList" class="block text-gray-700">Enter App Names (comma separated):</label>
+            <input type="text" id="appsList" class="block w-full mt-1 p-2 border rounded">
         </div>
-        <div class="mb-4">
-            <label for="image" class="block text-sm font-medium text-gray-700">העלה תמונה של האובייקט:</label>
-            <input type="file" id="image" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-        </div>
-        <button id="start" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">התחל זיהוי</button>
     </div>
 
     <script>
-        document.getElementById('start').addEventListener('click', function() {
-            const object = document.getElementById('object').value;
-            const action = document.getElementById('action').value;
-            const image = document.getElementById('image').files[0];
-            
-            if (!image) {
-                alert('אנא העלה תמונה של האובייקט');
-                return;
-            }
+        // Access the camera
+        const video = document.getElementById('videoElement');
+        const uploadedImage = document.getElementById('uploadedImage');
+        let targetObject = null;
+        let targetText = null;
+        let monitoring = false;
+        let backgroundPermission = false;
+        let monitoredApps = [];
 
-            alert(`זיהוי ${object} וביצוע ${action} עם התמונה ${image.name}`);
+        if (navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function (stream) {
+                    video.srcObject = stream;
+                })
+                .catch(function (error) {
+                    console.log("Something went wrong!");
+                });
+        }
+
+        // Load the COCO-SSD model and Tesseract.js
+        let model;
+        cocoSsd.load().then(loadedModel => {
+            model = loadedModel;
+        });
+
+        function detectFrame(video, model) {
+            if (!monitoring) return;
+
+            model.detect(video).then(predictions => {
+                // Check if the target object is detected
+                predictions.forEach(prediction => {
+                    if (prediction.class === targetObject) {
+                        // Perform the action
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                });
+
+                // Check for text detection
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                Tesseract.recognize(imageData, 'eng').then(({ data: { text } }) => {
+                    if (text.includes(targetText)) {
+                        // Perform the action
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                });
+
+                requestAnimationFrame(() => {
+                    detectFrame(video, model);
+                });
+            });
+        }
+
+        // Handle image upload
+        document.getElementById('imageUpload').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    uploadedImage.src = e.target.result;
+                    uploadedImage.classList.remove('hidden');
+                    detectImage(uploadedImage, model);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function detectImage(image, model) {
+            model.detect(image).then(predictions => {
+                // Display bounding boxes for detected objects
+                const canvas = document.createElement('canvas');
+                canvas.width = image.width;
+                canvas.height = image.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+                predictions.forEach(prediction => {
+                    ctx.strokeStyle = 'red';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(prediction.bbox[0], prediction.bbox[1], prediction.bbox[2], prediction.bbox[3]);
+                });
+
+                image.parentNode.insertBefore(canvas, image.nextSibling);
+
+                // Allow user to select target object
+                canvas.addEventListener('click', function(event) {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+
+                    predictions.forEach(prediction => {
+                        if (x >= prediction.bbox[0] && x <= prediction.bbox[0] + prediction.bbox[2] &&
+                            y >= prediction.bbox[1] && y <= prediction.bbox[1] + prediction.bbox[3]) {
+                            targetObject = prediction.class;
+                            alert(`Target object set to: ${targetObject}`);
+                        }
+                    });
+                });
+            });
+
+            // Detect text in the uploaded image
+            Tesseract.recognize(image, 'eng').then(({ data: { text } }) => {
+                const words = text.split(/\s+/);
+                const wordElements = words.map(word => {
+                    const span = document.createElement('span');
+                    span.textContent = word + ' ';
+                    span.classList.add('highlight');
+                    span.addEventListener('click', () => {
+                        targetText = word;
+                        alert(`Target text set to: ${targetText}`);
+                    });
+                    return span;
+                });
+
+                const textContainer = document.createElement('div');
+                wordElements.forEach(element => textContainer.appendChild(element));
+                image.parentNode.insertBefore(textContainer, image.nextSibling);
+            });
+        }
+
+        // Toggle monitoring
+        document.getElementById('toggleMonitoringButton').addEventListener('click', () => {
+            monitoring = !monitoring;
+            const button = document.getElementById('toggleMonitoringButton');
+            if (monitoring) {
+                button.textContent = 'Stop Monitoring';
+                button.classList.remove('bg-green-500');
+                button.classList.add('bg-red-500');
+                detectFrame(video, model);
+            } else {
+                button.textContent = 'Start Monitoring';
+                button.classList.remove('bg-red-500');
+                button.classList.add('bg-green-500');
+            }
+        });
+
+        // Request background permission
+        document.getElementById('requestPermissionButton').addEventListener('click', () => {
+            if (Notification.permission !== 'granted') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        backgroundPermission = true;
+                        alert('Background permission granted');
+                    } else {
+                        alert('Background permission denied');
+                    }
+                });
+            } else {
+                backgroundPermission = true;
+                alert('Background permission already granted');
+            }
+        });
+
+        // Handle app selection
+        document.getElementById('appSelect').addEventListener('change', function(event) {
+            const value = event.target.value;
+            const specificAppsDiv = document.getElementById('specificApps');
+            if (value === 'specific') {
+                specificAppsDiv.classList.remove('hidden');
+            } else {
+                specificAppsDiv.classList.add('hidden');
+                monitoredApps = [];
+            }
+        });
+
+        document.getElementById('appsList').addEventListener('input', function(event) {
+            const value = event.target.value;
+            monitoredApps = value.split(',').map(app => app.trim());
+        });
+
+        // Background monitoring logic
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js').then(registration => {
+                console.log('Service Worker registered with scope:', registration.scope);
+            }).catch(error => {
+                console.log('Service Worker registration failed:', error);
+            });
+        }
+
+        navigator.serviceWorker.addEventListener('message', event => {
+            if (event.data.type === 'DETECT_OBJECT') {
+                if (event.data.object === targetObject || event.data.text.includes(targetText)) {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }
         });
     </script>
+
+    <!-- Load TensorFlow.js, COCO-SSD model, and Tesseract.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js"></script>
 </body>
 </html>
